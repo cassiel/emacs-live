@@ -220,69 +220,73 @@
 
 (ert-deftest test-org-list/indent-item ()
   "Test `org-indent-item' specifications."
-  ;; 1. Error when not at an item.
+  ;; Error when not at an item.
   (org-test-with-temp-text "Paragraph."
     (should-error (org-indent-item)))
-  ;; 2. Error when trying to move first item of a list.
-  (org-test-with-temp-text "
+  ;; Error when trying to move first item of a list.
+  (should-error
+   (org-test-with-temp-text "
 - Item 1
 - Item 2"
-    (forward-line)
-    (should-error (org-indent-item)))
-  ;; 3. Indent a single item, not its children.
-  (org-test-with-temp-text "
+     (forward-line)
+     (org-indent-item)))
+  (should-error
+   (org-test-with-temp-text "
 - Item 1
-- Item 2
-  - Item 2.1"
-    (search-forward "- Item 2")
-    (let (org-list-demote-modify-bullet) (org-indent-item))
-    (should (equal (buffer-string)
-		   "
+- Item 2"
+     (forward-line)
+     (let ((org-list-automatic-rules nil)) (org-indent-item))))
+  ;; Indent a single item, not its children.
+  (should
+   (equal "
 - Item 1
   - Item 2
-  - Item 2.1")))
-  ;; 4. Follow `org-list-demote-modify-bullet' specifications.
-  ;;
-  ;; 4.1. With unordered lists.
-  (org-test-with-temp-text "
+  - Item 2.1"
+	  (org-test-with-temp-text "
 - Item 1
-- Item 2"
-    (search-forward "- Item 2")
-    (let ((org-list-demote-modify-bullet '(("-" . "+")))) (org-indent-item))
-    (should (equal (buffer-string)
-		   "
+- Item 2<point>
+  - Item 2.1"
+	    (let (org-list-demote-modify-bullet) (org-indent-item))
+	    (buffer-string))))
+  ;; Follow `org-list-demote-modify-bullet' specifications.
+  (should
+   (equal "
 - Item 1
-  + Item 2")))
-  ;; 4.2. and ordered lists.
-  (org-test-with-temp-text "
+  + Item 2"
+	  (org-test-with-temp-text "
+- Item 1
+- Item 2<point>"
+	    (let ((org-list-demote-modify-bullet '(("-" . "+"))))
+	      (org-indent-item))
+	    (buffer-string))))
+  (should
+   (equal "
 1. Item 1
-2. Item 2"
-    (search-forward "2. Item 2")
-    (let ((org-plain-list-ordered-item-terminator t)
-	  (org-list-demote-modify-bullet '(("1." . "+"))))
-      (org-indent-item))
-    (should (equal (buffer-string)
-		   "
+   + Item 2"
+	  (org-test-with-temp-text "
 1. Item 1
-   + Item 2")))
-  ;; 5. When a region is selected, indent every item within.
-  (org-test-with-temp-text "
-- Item 1
-- Item 2
-- Item 3
-"
-    (search-forward "- Item 2")
-    (beginning-of-line)
-    (transient-mark-mode 1)
-    (push-mark (point) t t)
-    (goto-char (point-max))
-    (let (org-list-demote-modify-bullet) (org-indent-item))
-    (should (equal (buffer-string)
-		   "
+2. Item 2<point>"
+	    (let ((org-plain-list-ordered-item-terminator t)
+		  (org-list-demote-modify-bullet '(("1." . "+"))))
+	      (org-indent-item))
+	    (buffer-string))))
+  ;; When a region is selected, indent every item within.
+  (should
+   (equal "
 - Item 1
   - Item 2
   - Item 3
-"))))
+"
+	  (org-test-with-temp-text "
+- Item 1
+<point>- Item 2
+- Item 3
+"
+	    (transient-mark-mode 1)
+	    (push-mark (point) t t)
+	    (goto-char (point-max))
+	    (let (org-list-demote-modify-bullet) (org-indent-item))
+	    (buffer-string)))))
 
 (ert-deftest test-org-list/indent-item-tree ()
   "Test `org-indent-item-tree' specifications."
@@ -481,9 +485,12 @@
     (should (equal (buffer-string)
 		   "- item 2\n- item 1\n  - sub-item 1")))
   ;; Preserve blank lines.
-  (org-test-with-temp-text "- item 1\n\n- item 2"
-    (let ((org-list-empty-line-terminates-plain-lists nil)) (org-move-item-down))
-    (should (equal (buffer-string) "- item 2\n\n- item 1")))
+  (should
+   (equal
+    "- item 2\n\n- item 1"
+    (org-test-with-temp-text "- item 1\n\n- item 2"
+      (org-move-item-down)
+      (buffer-string))))
   ;; Error when trying to move the last item...
   (org-test-with-temp-text "- item 1\n- item 2"
     (forward-line)
@@ -525,8 +532,10 @@
     (search-forward "sub-body 1")
     (should (org-invisible-p2))
     (search-backward "sub-body 2")
-    (should (org-invisible-p2)))
-  ;; Preserve contents visibility.
+    (should (org-invisible-p2))))
+
+(ert-deftest test-org-list/move-item-down-contents-visibility ()
+  "Preserve contents visibility."
   (org-test-with-temp-text "
 - item 1
   #+BEGIN_CENTER
@@ -537,12 +546,21 @@
   Text2
   #+END_CENTER"
     (org-hide-block-all)
-    (search-forward "- item 1")
-    (org-move-item-down)
-    (search-forward "Text1")
-    (should (org-invisible-p2))
-    (search-backward "Text2")
-    (should (org-invisible-p2))))
+    (let ((invisible-property-1
+	   (progn
+	     (search-forward "Text1")
+	     (get-char-property (point) 'invisible)))
+	  (invisible-property-2
+	   (progn
+	     (search-forward "Text2")
+	     (get-char-property (point) 'invisible))))
+      (goto-char (point-min))
+      (search-forward "- item 1")
+      (org-move-item-down)
+      (search-forward "Text1")
+      (should (eq invisible-property-1 (get-char-property (point) 'invisible)))
+      (search-backward "Text2")
+      (should (eq invisible-property-2 (get-char-property (point) 'invisible))))))
 
 (ert-deftest test-org-list/move-item-up ()
   "Test `org-move-item-up' specifications."
@@ -565,10 +583,13 @@
     (should (equal (buffer-string)
 		   "- item 2\n  - sub-item 2\n- item 1")))
   ;; Preserve blank lines.
-  (org-test-with-temp-text "- item 1\n\n- item 2"
-    (search-forward "- item 2")
-    (let ((org-list-empty-line-terminates-plain-lists nil)) (org-move-item-up))
-    (should (equal (buffer-string) "- item 2\n\n- item 1")))
+  (should
+   (equal
+    "- item 2\n\n- item 1"
+    (org-test-with-temp-text "- item 1\n\n- item 2"
+      (search-forward "- item 2")
+      (org-move-item-up)
+      (buffer-string))))
   ;; Error when trying to move the first item...
   (org-test-with-temp-text "- item 1\n- item 2"
     (should-error (org-move-item-up)))
@@ -607,8 +628,9 @@
     (search-forward "sub-body 2")
     (should (org-invisible-p2))
     (search-forward "sub-body 1")
-    (should (org-invisible-p2)))
-  ;; Preserve contents visibility.
+    (should (org-invisible-p2))))
+
+(ert-deftest test-org-list/move-item-up-contents-visibility ()
   (org-test-with-temp-text "
 - item 1
   #+BEGIN_CENTER
@@ -619,31 +641,30 @@
   Text2
   #+END_CENTER"
     (org-hide-block-all)
-    (search-forward "- item 2")
-    (org-move-item-up)
-    (search-forward "Text2")
-    (should (org-invisible-p2))
-    (search-forward "Text1")
-    (should (org-invisible-p2))))
+    (let ((invisible-property-1
+	   (progn
+	     (search-forward "Text1")
+	     (get-char-property (point) 'invisible)))
+          (invisible-property-2
+	   (progn
+	     (search-forward "Text2")
+	     (get-char-property (point) 'invisible))))
+      (goto-char (point-min))
+      (search-forward "- item 2")
+      (org-move-item-up)
+      (search-forward "Text2")
+      (should (eq invisible-property-2 (get-char-property (point) 'invisible)))
+      (search-forward "Text1")
+      (should (eq invisible-property-1 (get-char-property (point) 'invisible))))))
 
 (ert-deftest test-org-list/insert-item ()
   "Test item insertion."
   ;; Blank lines specifications.
   ;;
-  ;; Non-nil `org-blank-before-new-entry': insert a blank line, unless
-  ;; `org-list-empty-line-terminates-plain-lists' is non-nil.
+  ;; Non-nil `org-blank-before-new-entry': insert a blank line.
   (should
    (org-test-with-temp-text "- a"
-     (let ((org-list-empty-line-terminates-plain-lists nil)
-	   (org-blank-before-new-entry '((plain-list-item . t))))
-       (end-of-line)
-       (org-insert-item)
-       (forward-line -1)
-       (looking-at "$"))))
-  (should-not
-   (org-test-with-temp-text "- a"
-     (let ((org-list-empty-line-terminates-plain-lists t)
-	   (org-blank-before-new-entry '((plain-list-item . t))))
+     (let ((org-blank-before-new-entry '((plain-list-item . t))))
        (end-of-line)
        (org-insert-item)
        (forward-line -1)
@@ -651,8 +672,7 @@
   ;; Nil `org-blank-before-new-entry': do not insert a blank line.
   (should-not
    (org-test-with-temp-text "- a"
-     (let ((org-list-empty-line-terminates-plain-lists nil)
-	   (org-blank-before-new-entry '((plain-list-item . nil))))
+     (let ((org-blank-before-new-entry '((plain-list-item . nil))))
        (end-of-line)
        (org-insert-item)
        (forward-line -1)
@@ -661,8 +681,7 @@
   ;; line already in the sole item, do not insert one.
   (should-not
    (org-test-with-temp-text "- a"
-     (let ((org-list-empty-line-terminates-plain-lists nil)
-	   (org-blank-before-new-entry '((plain-list-item . auto))))
+     (let ((org-blank-before-new-entry '((plain-list-item . auto))))
        (end-of-line)
        (org-insert-item)
        (forward-line -1)
@@ -670,45 +689,37 @@
   ;; `org-blank-before-new-entry' set to `auto': if there's a blank
   ;; line in the sole item, insert another one.
   (should
-   (org-test-with-temp-text "- a\n\n  b"
-     (let ((org-list-empty-line-terminates-plain-lists nil)
-	   (org-blank-before-new-entry '((plain-list-item . auto))))
-       (goto-char (point-max))
+   (org-test-with-temp-text "- a\n\n  b<point>"
+     (let ((org-blank-before-new-entry '((plain-list-item . auto))))
        (org-insert-item)
        (forward-line -1)
        (looking-at "$"))))
   ;; `org-blank-before-new-entry' set to `auto': if the user specified
   ;; a blank line, preserve it.
   (should
-   (org-test-with-temp-text "- a\n\n"
-     (let ((org-list-empty-line-terminates-plain-lists nil)
-	   (org-blank-before-new-entry '((plain-list-item . auto))))
-       (goto-char (point-max))
+   (org-test-with-temp-text "- a\n\n<point>"
+     (let ((org-blank-before-new-entry '((plain-list-item . auto))))
        (org-insert-item)
        (forward-line -1)
        (looking-at "$"))))
   ;; `org-blank-before-new-entry' set to `auto': if some items in list
   ;; are already separated by blank lines, insert one.
   (should
-   (org-test-with-temp-text "- a\n\n- b"
-     (let ((org-list-empty-line-terminates-plain-lists nil)
-	   (org-blank-before-new-entry '((plain-list-item . auto))))
-       (goto-char (point-max))
+   (org-test-with-temp-text "- a\n\n- b<point>"
+     (let ((org-blank-before-new-entry '((plain-list-item . auto))))
        (org-insert-item)
        (forward-line -1)
        (looking-at "$"))))
   (should
    (org-test-with-temp-text "- a\n\n- b"
-     (let ((org-list-empty-line-terminates-plain-lists nil)
-	   (org-blank-before-new-entry '((plain-list-item . auto))))
+     (let ((org-blank-before-new-entry '((plain-list-item . auto))))
        (org-insert-item)
        (forward-line)
        (looking-at "$"))))
   (should
-   (org-test-with-temp-text "- a\n  #+BEGIN_EXAMPLE\n\n  x\n  #+END_EXAMPLE"
-     (let ((org-list-empty-line-terminates-plain-lists nil)
-	   (org-blank-before-new-entry '((plain-list-item . auto))))
-       (goto-char (point-max))
+   (org-test-with-temp-text
+       "- a\n  #+BEGIN_EXAMPLE\n\n  x\n  #+END_EXAMPLE<point>"
+     (let ((org-blank-before-new-entry '((plain-list-item . auto))))
        (org-insert-item)
        (forward-line -1)
        (looking-at "$"))))
@@ -749,7 +760,19 @@
 	  (org-test-with-temp-text "- it<point>em"
 	    (let ((org-M-RET-may-split-line  '((default . nil))))
 	      (org-insert-item))
-	    (buffer-string)))))
+	    (buffer-string))))
+  ;; Preserve list visibility when inserting an item.
+  (should
+   (equal
+    '(outline outline)
+    (org-test-with-temp-text "- A\n  - B\n- C\n  - D"
+      (let ((org-cycle-include-plain-lists t))
+	(org-cycle)
+	(forward-line 2)
+	(org-cycle)
+	(org-insert-item)
+	(list (get-char-property (line-beginning-position 0) 'invisible)
+	      (get-char-property (line-end-position 2) 'invisible)))))))
 
 (ert-deftest test-org-list/repair ()
   "Test `org-list-repair' specifications."
@@ -884,6 +907,184 @@
 
 
 
+;;; Miscellaneous
+
+(ert-deftest test-org-list/toggle-item ()
+  "Test `org-toggle-item' specifications."
+  ;; Convert normal lines to items.
+  (should
+   (equal "- line"
+	  (org-test-with-temp-text "line"
+	    (org-toggle-item nil)
+	    (buffer-string))))
+  ;; Convert items to normal lines.
+  (should
+   (equal "line"
+	  (org-test-with-temp-text "- line"
+	    (org-toggle-item nil)
+	    (buffer-string))))
+  ;; Convert headlines to items.
+  (should
+   (equal "- line"
+	  (org-test-with-temp-text "* line"
+	    (org-toggle-item nil)
+	    (buffer-string))))
+  ;; When converting a headline to a list item, TODO keywords become
+  ;; checkboxes.
+  (should
+   (equal "- [X] line"
+	  (org-test-with-temp-text "* DONE line"
+	    (org-toggle-item nil)
+	    (buffer-string))))
+  (should
+   (equal "- [ ] line"
+	  (org-test-with-temp-text "* TODO line"
+	    (org-toggle-item nil)
+	    (buffer-string))))
+  ;; When a region is marked and first line is a headline, all
+  ;; headlines are turned into items.
+  (should
+   (equal "- H1\n  - H2"
+	  (org-test-with-temp-text "* H1\n** H2"
+	    (transient-mark-mode 1)
+	    (push-mark (point) t t)
+	    (goto-char (point-max))
+	    (org-toggle-item nil)
+	    (buffer-string))))
+  (should
+   (equal "- [ ] H1\n  - [ ] H2"
+	  (org-test-with-temp-text "* TODO H1\n** TODO H2"
+	    (transient-mark-mode 1)
+	    (push-mark (point) t t)
+	    (goto-char (point-max))
+	    (org-toggle-item nil)
+	    (buffer-string))))
+  ;; When turning headlines into items, make sure headings contents
+  ;; are kept within items.
+  (should
+   (equal "- H1\n  Text"
+	  (org-test-with-temp-text "* H1\nText"
+	    (transient-mark-mode 1)
+	    (push-mark (point) t t)
+	    (goto-char (point-max))
+	    (org-toggle-item nil)
+	    (buffer-string))))
+  ;; When a region is marked and first line is an item, all items are
+  ;; turned into normal lines.
+  (should
+   (equal "1\n  2"
+	  (org-test-with-temp-text "- 1\n  - 2"
+	    (transient-mark-mode 1)
+	    (push-mark (point) t t)
+	    (goto-char (point-max))
+	    (org-toggle-item nil)
+	    (buffer-string))))
+  (should
+   (equal "1\n2"
+	  (org-test-with-temp-text "- 1\n2"
+	    (transient-mark-mode 1)
+	    (push-mark (point) t t)
+	    (goto-char (point-max))
+	    (org-toggle-item nil)
+	    (buffer-string))))
+  ;; When a region is marked and first line is an item, all normal
+  ;; lines are turned into items.
+  (should
+   (equal "- line 1\n- line 2"
+	  (org-test-with-temp-text "line 1\nline 2"
+	    (transient-mark-mode 1)
+	    (push-mark (point) t t)
+	    (goto-char (point-max))
+	    (org-toggle-item nil)
+	    (buffer-string))))
+  (should
+   (equal "- line 1\n- line 2"
+	  (org-test-with-temp-text "line 1\n- line 2"
+	    (transient-mark-mode 1)
+	    (push-mark (point) t t)
+	    (goto-char (point-max))
+	    (org-toggle-item nil)
+	    (buffer-string))))
+  ;; When argument ARG is non-nil, change the whole region into
+  ;; a single item.
+  (should
+   (equal "- line 1\n  line 2"
+	  (org-test-with-temp-text "line 1\nline 2"
+	    (transient-mark-mode 1)
+	    (push-mark (point) t t)
+	    (goto-char (point-max))
+	    (org-toggle-item t)
+	    (buffer-string)))))
+
+(ert-deftest test-org-list/sort ()
+  "Test `org-sort-list'."
+  ;; Sort alphabetically.
+  (should
+   (equal "- abc\n- def\n- xyz\n"
+	  (org-test-with-temp-text "- def\n- xyz\n- abc\n"
+	    (org-sort-list nil ?a)
+	    (buffer-string))))
+  (should
+   (equal "- xyz\n- def\n- abc\n"
+	  (org-test-with-temp-text "- def\n- xyz\n- abc\n"
+	    (org-sort-list nil ?A)
+	    (buffer-string))))
+  ;; Sort numerically.
+  (should
+   (equal "- 1\n- 2\n- 10\n"
+	  (org-test-with-temp-text "- 10\n- 1\n- 2\n"
+	    (org-sort-list nil ?n)
+	    (buffer-string))))
+  (should
+   (equal "- 10\n- 2\n- 1\n"
+	  (org-test-with-temp-text "- 10\n- 1\n- 2\n"
+	    (org-sort-list nil ?N)
+	    (buffer-string))))
+  ;; Sort by checked status.
+  (should
+   (equal "- [ ] xyz\n- [ ] def\n- [X] abc\n"
+	  (org-test-with-temp-text "- [X] abc\n- [ ] xyz\n- [ ] def\n"
+	    (org-sort-list nil ?x)
+	    (buffer-string))))
+  (should
+   (equal "- [X] abc\n- [ ] xyz\n- [ ] def\n"
+	  (org-test-with-temp-text "- [X] abc\n- [ ] xyz\n- [ ] def\n"
+	    (org-sort-list nil ?X)
+	    (buffer-string))))
+  ;; Sort by time stamp.
+  (should
+   (equal "- <2017-05-08 Mon>\n- <2017-05-09 Tue>\n- <2018-05-09 Wed>\n"
+	  (org-test-with-temp-text
+	      "- <2018-05-09 Wed>\n- <2017-05-09 Tue>\n- <2017-05-08 Mon>\n"
+	    (org-sort-list nil ?t)
+	    (buffer-string))))
+  (should
+   (equal "- <2018-05-09 Wed>\n- <2017-05-09 Tue>\n- <2017-05-08 Mon>\n"
+	  (org-test-with-temp-text
+	      "- <2018-05-09 Wed>\n- <2017-05-09 Tue>\n- <2017-05-08 Mon>\n"
+	    (org-sort-list nil ?T)
+	    (buffer-string))))
+  ;; Sort by custom function.
+  (should
+   (equal "- b\n- aa\n- ccc\n"
+	  (org-test-with-temp-text "- ccc\n- b\n- aa\n"
+	    (org-sort-list nil ?f
+			   (lambda ()
+			     (length (buffer-substring (point-at-bol)
+						       (point-at-eol))))
+			   #'<)
+	    (buffer-string))))
+  (should
+   (equal "- ccc\n- aa\n- b\n"
+	  (org-test-with-temp-text "- ccc\n- b\n- aa\n"
+	    (org-sort-list nil ?F
+			   (lambda ()
+			     (length (buffer-substring (point-at-bol)
+						       (point-at-eol))))
+			   #'<)
+	    (buffer-string)))))
+
+
 ;;; Radio Lists
 
 (ert-deftest test-org-list/send-list ()
@@ -920,7 +1121,233 @@
 - item
 @end ignore"
      (forward-line 3)
-     (org-list-send-list))))
+     (org-list-send-list)))
+  ;; Allow multiple receiver locations.
+  (should
+   (org-test-with-temp-text "
+@c BEGIN RECEIVE ORGLST list
+@c END RECEIVE ORGLST list
+
+@ignore
+#+ORGLST: SEND list org-list-to-texinfo
+<point>- item contents
+@end ignore
+
+@c BEGIN RECEIVE ORGLST list
+@c END RECEIVE ORGLST list"
+     (org-list-send-list)
+     (goto-char (point-min))
+     (search-forward "item contents" nil t 3))))
+
+(ert-deftest test-org-list/to-generic ()
+  "Test `org-list-to-generic' specifications."
+  ;; Test `:ustart' and `:uend' parameters.
+  (should
+   (equal
+    "begin\na"
+    (org-test-with-temp-text "- a"
+      (org-list-to-generic (org-list-to-lisp) '(:ustart "begin")))))
+  (should-not
+   (equal
+    "begin\na"
+    (org-test-with-temp-text "1. a"
+      (org-list-to-generic (org-list-to-lisp) '(:ustart "begin")))))
+  (should
+   (equal
+    "a\nend"
+    (org-test-with-temp-text "- a"
+      (org-list-to-generic (org-list-to-lisp) '(:uend "end")))))
+  (should-not
+   (equal
+    "a\nend"
+    (org-test-with-temp-text "1. a"
+      (org-list-to-generic (org-list-to-lisp) '(:uend "end")))))
+  (should
+   (equal
+    "begin l1\na\nbegin l2\nb\nend l2\nend l1"
+    (org-test-with-temp-text "- a\n  - b"
+      (org-list-to-generic
+       (org-list-to-lisp)
+       (list :ustart (lambda (l)  (format "begin l%d" l))
+	     :uend (lambda (l)  (format "end l%d" l)))))))
+  ;; Test `:ostart' and `:oend' parameters.
+  (should
+   (equal
+    "begin\na"
+    (org-test-with-temp-text "1. a"
+      (org-list-to-generic (org-list-to-lisp) '(:ostart "begin")))))
+  (should-not
+   (equal
+    "begin\na"
+    (org-test-with-temp-text "- a"
+      (org-list-to-generic (org-list-to-lisp) '(:ostart "begin")))))
+  (should
+   (equal
+    "a\nend"
+    (org-test-with-temp-text "1. a"
+      (org-list-to-generic (org-list-to-lisp) '(:oend "end")))))
+  (should-not
+   (equal
+    "a\nend"
+    (org-test-with-temp-text "- a"
+      (org-list-to-generic (org-list-to-lisp) '(:oend "end")))))
+  (should
+   (equal
+    "begin l1\na\nbegin l2\nb\nend l2\nend l1"
+    (org-test-with-temp-text "1. a\n  1. b"
+      (org-list-to-generic
+       (org-list-to-lisp)
+       (list :ostart (lambda (l)  (format "begin l%d" l))
+	     :oend (lambda (l)  (format "end l%d" l)))))))
+  ;; Test `:dstart' and `:dend' parameters.
+  (should
+   (equal
+    "begin\ntaga"
+    (org-test-with-temp-text "- tag :: a"
+      (org-list-to-generic (org-list-to-lisp) '(:dstart "begin")))))
+  (should-not
+   (equal
+    "begin\na"
+    (org-test-with-temp-text "- a"
+      (org-list-to-generic (org-list-to-lisp) '(:dstart "begin")))))
+  (should
+   (equal
+    "taga\nend"
+    (org-test-with-temp-text "- tag :: a"
+      (org-list-to-generic (org-list-to-lisp) '(:dend "end")))))
+  (should-not
+   (equal
+    "a\nend"
+    (org-test-with-temp-text "- a"
+      (org-list-to-generic (org-list-to-lisp) '(:dend "end")))))
+  (should
+   (equal
+    "begin l1\ntag1a\nbegin l2\ntag2b\nend l2\nend l1"
+    (org-test-with-temp-text "- tag1 :: a\n  - tag2 :: b"
+      (org-list-to-generic
+       (org-list-to-lisp)
+       (list :dstart (lambda (l)  (format "begin l%d" l))
+	     :dend (lambda (l)  (format "end l%d" l)))))))
+  ;; Test `:dtstart', `:dtend', `:ddstart' and `:ddend' parameters.
+  (should
+   (equal
+    ">tag<a"
+    (org-test-with-temp-text "- tag :: a"
+      (org-list-to-generic (org-list-to-lisp) '(:dtstart ">" :dtend "<")))))
+  (should
+   (equal
+    "tag>a<"
+    (org-test-with-temp-text "- tag :: a"
+      (org-list-to-generic (org-list-to-lisp) '(:ddstart ">" :ddend "<")))))
+  ;; Test `:istart' and `:iend' parameters.
+  (should
+   (equal
+    "starta"
+    (org-test-with-temp-text "- a"
+      (org-list-to-generic (org-list-to-lisp) '(:istart "start")))))
+  (should
+   (equal
+    "level1 a\nlevel2 b"
+    (org-test-with-temp-text "- a\n  - b"
+      (org-list-to-generic (org-list-to-lisp)
+			   '(:istart (lambda (type l) (format "level%d "l)))))))
+  (should
+   (equal
+    "a\nblevel2level1"
+    (org-test-with-temp-text "- a\n  - b"
+      (org-list-to-generic (org-list-to-lisp)
+			   '(:iend (lambda (type l) (format "level%d" l)))))))
+  ;; Test `:icount' parameter.
+  (should
+   (equal
+    "counta"
+    (org-test-with-temp-text "1. [@3] a"
+      (org-list-to-generic (org-list-to-lisp) '(:icount "count")))))
+  (should-not
+   (equal
+    "counta"
+    (org-test-with-temp-text "1. a"
+      (org-list-to-generic (org-list-to-lisp) '(:icount "count")))))
+  (should
+   (equal
+    "counta"
+    (org-test-with-temp-text "1. [@3] a"
+      (org-list-to-generic (org-list-to-lisp)
+			   '(:icount "count" :istart "start")))))
+  (should
+   (equal
+    "level:1, counter:3 a"
+    (org-test-with-temp-text "1. [@3] a"
+      (org-list-to-generic
+       (org-list-to-lisp)
+       '(:icount (lambda (type l c) (format "level:%d, counter:%d " l c)))))))
+  ;; Test `:isep' parameter.
+  (should
+   (equal
+    "a\n--\nb"
+    (org-test-with-temp-text "- a\n- b"
+      (org-list-to-generic (org-list-to-lisp) '(:isep "--")))))
+  (should-not
+   (equal
+    "a\n--\nb"
+    (org-test-with-temp-text "- a\n  - b"
+      (org-list-to-generic (org-list-to-lisp) '(:isep "--")))))
+  (should
+   (equal
+    "a\n- 1 -\nb"
+    (org-test-with-temp-text "- a\n- b"
+      (org-list-to-generic
+       (org-list-to-lisp)
+       '(:isep (lambda (type depth) (format "- %d -" depth)))))))
+  ;; Test `:ifmt' parameter.
+  (should
+   (equal
+    ">> a <<"
+    (org-test-with-temp-text "1. [@3] a"
+      (org-list-to-generic
+       (org-list-to-lisp)
+       '(:ifmt (lambda (type c) (format ">> %s <<" c)))))))
+  ;; Test `:cbon', `:cboff', `:cbtrans'
+  (should
+   (equal
+    "!a"
+    (org-test-with-temp-text "- [X] a"
+      (org-list-to-generic (org-list-to-lisp) '(:cbon "!")))))
+  (should-not
+   (equal
+    "!a"
+    (org-test-with-temp-text "- [X] a"
+      (org-list-to-generic (org-list-to-lisp) '(:cboff "!" :cbtrans "!")))))
+  (should
+   (equal
+    "!a"
+    (org-test-with-temp-text "- [ ] a"
+      (org-list-to-generic (org-list-to-lisp) '(:cboff "!")))))
+  (should-not
+   (equal
+    "!a"
+    (org-test-with-temp-text "- [ ] a"
+      (org-list-to-generic (org-list-to-lisp) '(:cbon "!" :cbtrans "!")))))
+  (should
+   (equal
+    "!a"
+    (org-test-with-temp-text "- [-] a"
+      (org-list-to-generic (org-list-to-lisp) '(:cbtrans "!")))))
+  (should-not
+   (equal
+    "!a"
+    (org-test-with-temp-text "- [-] a"
+      (org-list-to-generic (org-list-to-lisp) '(:cbon "!" :cboff "!")))))
+  ;; Test `:splice' parameter.
+  (should
+   (equal
+    "a"
+    (org-test-with-temp-text "- a"
+      (org-list-to-generic (org-list-to-lisp)
+			   '(:ustart "begin" :uend "end" :splice t)))))
+  ;; No error on empty lists.
+  (should
+   (org-test-with-temp-text "-" (org-list-to-generic (org-list-to-lisp) nil))))
 
 (ert-deftest test-org-list/to-html ()
   "Test `org-list-to-html' specifications."
@@ -991,6 +1418,39 @@
 		    (beginning-of-line)
 		    (skip-chars-backward " \r\t\n")
 		    (point)))))))
+
+(ert-deftest test-org-list/to-org ()
+  "Test `org-list-to-org' specifications."
+  ;; Un-ordered list.
+  (should
+   (equal "- a"
+	  (org-test-with-temp-text "- a"
+	    (org-list-to-org (org-list-to-lisp) nil))))
+  ;; Ordered list.
+  (should
+   (equal "1. a"
+	  (org-test-with-temp-text "1. a"
+	    (org-list-to-org (org-list-to-lisp) nil))))
+  ;; Descriptive list.
+  (should
+   (equal "- a :: b"
+	  (org-test-with-temp-text "- a :: b"
+	    (org-list-to-org (org-list-to-lisp) nil))))
+  ;; Nested list.
+  (should
+   (equal "- a\n  - b"
+	  (org-test-with-temp-text "- a\n  - b"
+	    (org-list-to-org (org-list-to-lisp) nil))))
+  ;; Item spanning over multiple lines.
+  (should
+   (equal "- a\n  b"
+	  (org-test-with-temp-text "- a\n  b"
+	    (org-list-to-org (org-list-to-lisp) nil))))
+  ;; Item with continuation text after a sub-list.
+  (should
+   (equal "- a\n  - b\n  c"
+	  (org-test-with-temp-text "- a\n  - b\n  c"
+	    (org-list-to-org (org-list-to-lisp) nil)))))
 
 
 (provide 'test-org-list)
