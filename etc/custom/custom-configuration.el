@@ -9,8 +9,15 @@
  '(haskell-tags-on-save t)
  '(org-agenda-files
    (quote
+<<<<<<< HEAD
     ("~/Library/Mobile Documents/M6HJR9W95L~com~textasticapp~textastic/Documents/organisation/aims-home-2019.org" "~/Library/Mobile Documents/M6HJR9W95L~com~textasticapp~textastic/Documents/organisation/aims-work-2019.org" "~/TEXTASTIC/organisation/volatile.org" "~/TEXTASTIC/organisation/teaching.org" "~/TEXTASTIC/organisation/projects.org" "~/TEXTASTIC/organisation/german.org" "~/TEXTASTIC/organisation/admin.org" "~/TEXTASTIC/organisation/activities.org")))
  '(package-selected-packages (quote (toc-org projectile coffee-mode adaptive-wrap)))
+=======
+    ("~/Library/Mobile Documents/M6HJR9W95L~com~textasticapp~textastic/Documents/organisation/aims-work-2019.org" "~/Library/Mobile Documents/M6HJR9W95L~com~textasticapp~textastic/Documents/organisation/aims-home-2019.org" "~/Library/Mobile Documents/M6HJR9W95L~com~textasticapp~textastic/Documents/organisation/aims-2018.org" "~/TEXTASTIC/organisation/volatile.org" "~/TEXTASTIC/organisation/teaching.org" "~/TEXTASTIC/organisation/projects.org" "~/TEXTASTIC/organisation/german.org" "~/TEXTASTIC/organisation/admin.org" "~/TEXTASTIC/organisation/activities.org" "~/TEXTASTIC/organisation/23admiral.org")))
+ '(package-selected-packages
+   (quote
+    (cider toc-org projectile coffee-mode adaptive-wrap)))
+>>>>>>> 30d3b355b8e13e0aeff59552b40b4f9220181935
  '(sclang-auto-scroll-post-buffer t)
  '(sclang-eval-line-forward nil))
 (custom-set-faces
