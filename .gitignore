@@ -27,3 +27,4 @@ swank/*
 ido.last
 smex-items
 projectile-bookmarks.eld
+*.cache

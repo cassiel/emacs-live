@@ -232,4 +232,8 @@
 
 (message "\n\n Pack loading completed. Your Emacs is Live...\n\n")
 (put 'downcase-region 'disabled nil)
+<<<<<<< HEAD
+=======
+(put 'set-goal-column 'disabled nil)
+>>>>>>> 0a65b4aaa1ce4d5f70ae231f6be62fb6e96c0863
 (put 'narrow-to-region 'disabled nil)
