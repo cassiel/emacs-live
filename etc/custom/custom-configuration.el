@@ -9,7 +9,7 @@
  '(haskell-tags-on-save t)
  '(org-agenda-files
    (quote
-    ("~/Library/Mobile Documents/M6HJR9W95L~com~textasticapp~textastic/Documents/organisation/aims-work-2019.org" "~/Library/Mobile Documents/M6HJR9W95L~com~textasticapp~textastic/Documents/organisation/aims-home-2019.org" "~/Library/Mobile Documents/M6HJR9W95L~com~textasticapp~textastic/Documents/organisation/aims-2018.org" "~/TEXTASTIC/organisation/volatile.org" "~/TEXTASTIC/organisation/teaching.org" "~/TEXTASTIC/organisation/projects.org" "~/TEXTASTIC/organisation/german.org" "~/TEXTASTIC/organisation/admin.org" "~/TEXTASTIC/organisation/activities.org" "~/TEXTASTIC/organisation/23admiral.org")))
+    ("~/LINKS/organisation-rave/aims-work-2019.org" "~/LINKS/organisation/aims-home-2019.org" "~/LINKS/organisation/aims-2018.org" "~/LINKS/organisation/volatile.org" "~/LINKS/organisation-rave/teaching.org" "~/LINKS/organisation/projects.org" "~/LINKS/organisation/german.org" "~/LINKS/organisation/admin.org" "~/LINKS/organisation/activities.org" "~/LINKS/organisation/23admiral.org")))
  '(package-selected-packages
    (quote
     (lua-mode cider toc-org projectile coffee-mode adaptive-wrap)))
